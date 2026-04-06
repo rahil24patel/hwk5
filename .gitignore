@@ -1,0 +1,26 @@
+cat > ~/econ470/a0/work/hwk5/.gitignore << 'EOF'
+
+cat > ~/econ470/a0/work/hwk5/.gitignore << 'EOF'
+
+# Quarto intermediates
+*.tex
+*.quarto_ipynb
+.quarto/
+*_files/
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Data inputs (large raw files)
+data/input/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
