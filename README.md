@@ -1,2 +1,5 @@
-#Homework 5
+# Homework 5
 
+This is my Homework 5 submission, by Rahil Patel. I built all datasets in hwk5_dataset and answered all questions in hwk5_analysis.
+
+The dataset notebook pulls the cleaned HCRIS panel from hwk4, extracts state identifiers from provider numbers using Medicare state codes, and drops non-50-state rows. Uncompensated care comes from three lines on the S-10 worksheet of the raw HCRIS v2010 files (charges, partial payments, and bad debt) combined using the formula from class. Duplicate reports are resolved. Medicaid expansion dates from the Kaiser Family Foundation are merged onto HCRIS via a state name crosswalk. Key variables include uncomp_care_m, expand_ever, treat, post, time_to_treat, and time_to_treat_bin. Output files are hcris_kff_full.csv (full 50-state panel, 2011-2018) and hcris_kff_2014.csv (2014 expanders and never-expanders only).
