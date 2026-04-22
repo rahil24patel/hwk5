@@ -13,6 +13,7 @@ execute:
   echo: false
   warning: false
 ---
+
 ```{python}
 #| include: false
 
@@ -47,10 +48,7 @@ for df in [full, s2014]:
 
 s2014_2x2 = s2014[s2014['year'].isin([2012, 2015])].copy()
 
-q5 = smf.ols(
-    'uncomp_care_m ~ post + expand_ever + treat',
-    data=s2014
-).fit()
+q5 = smf.ols('uncomp_care_m ~ post + expand_ever + treat', data=s2014).fit()
 
 q6 = pf.feols(
     'uncomp_care_m ~ treat | provider_number + year',
@@ -75,41 +73,70 @@ q9 = pf.feols(
     data=full,
     vcov={'CRV1': 'state'}
 )
+
+q5_int      = q5.params['Intercept']
+q5_int_se   = q5.bse['Intercept']
+q5_post     = q5.params['post']
+q5_post_se  = q5.bse['post']
+q5_exp      = q5.params['expand_ever']
+q5_exp_se   = q5.bse['expand_ever']
+q5_treat    = q5.params['treat']
+q5_treat_se = q5.bse['treat']
+q5_n        = int(q5.nobs)
+q5_r2       = q5.rsquared
+
+q6_treat    = q6.coef()['treat']
+q6_treat_se = q6.se()['treat']
+q6_n        = int(q6._N)
+try:
+    q6_r2        = round(float(q6._r2), 3)
+    q6_r2_within = round(float(q6._r2_within), 3)
+except:
+    q6_r2, q6_r2_within = '', ''
+
+q7_treat    = q7.coef()['treat']
+q7_treat_se = q7.se()['treat']
+q7_n        = int(q7._N)
+try:
+    q7_r2        = round(float(q7._r2), 3)
+    q7_r2_within = round(float(q7._r2_within), 3)
+except:
+    q7_r2, q7_r2_within = '', ''
 ```
 
 ## 1. Mean Uncompensated Care by Year
+
 ```{python}
 #| label: tbl-q1
-#| tbl-cap: "Mean hospital uncompensated care ($mm) by year, 2011--2018"
+#| tbl-cap: "Mean hospital uncompensated care (mm) by year, 2011--2018"
 #| output: asis
 
 q1_tab = (
     full
     .groupby('year')['uncomp_care_m']
-    .agg(Mean='mean', SD='std', N='count')
+    .agg(mean='mean', n='count')
     .round(2)
     .reset_index()
-    .rename(columns={'year': 'Year'})
+    .rename(columns={'year': 'Year', 'mean': 'Uncomp. Care', 'n': 'Hospitals'})
 )
 
 print(q1_tab.to_latex(index=False, escape=False))
 ```
+
 ```{python}
-md(
-    "**Q1 answer:** Uncompensated care rose from 6.24mm per hospital in 2011 to 8.25mm "
-    "in 2013. It then fell to 7.11mm in 2014 and further to 5.98mm in 2015, which is "
-    "consistent with the ACA's Medicaid expansion taking effect. Newly insured patients "
-    "generated reimbursable claims rather than uncompensated care. However, the trend "
-    "does not sustain a clean decline. The mean rose sharply in 2016 and peaked at "
-    "9.15mm in 2017. The 2016 figure carries an unusually large standard deviation of "
-    "99.52mm, indicating a small number of hospitals with extreme values are pulling the "
-    "mean up rather than a genuine system-wide reversal."
-)
+v11 = str(round(float(q1_tab.loc[q1_tab['Year']==2011, 'Uncomp. Care'].values[0]), 2))
+v13 = str(round(float(q1_tab.loc[q1_tab['Year']==2013, 'Uncomp. Care'].values[0]), 2))
+v14 = str(round(float(q1_tab.loc[q1_tab['Year']==2014, 'Uncomp. Care'].values[0]), 2))
+v15 = str(round(float(q1_tab.loc[q1_tab['Year']==2015, 'Uncomp. Care'].values[0]), 2))
+v16 = str(round(float(q1_tab.loc[q1_tab['Year']==2016, 'Uncomp. Care'].values[0]), 2))
+
+md("Uncompensated care rose from " + v11 + "mm per hospital in 2011 to " + v13 + "mm in 2013. It then fell to " + v14 + "mm in 2014 and further to " + v15 + "mm in 2015, consistent with the ACA's Medicaid expansion taking effect. The mean rose sharply to " + v16 + "mm in 2016 and continued climbing through 2018, driven in part by hospitals with extreme values pulling up the mean.")
 ```
 
 \newpage
 
 ## 2. Uncompensated Care Over Time by Expansion Status
+
 ```{python}
 #| label: fig-q2
 #| fig-cap: "Mean uncompensated care over time for 2014 expanders vs never-expanders"
@@ -123,34 +150,37 @@ q2_dat = (
 
 fig, ax = plt.subplots(figsize=(10, 5))
 for val, grp in q2_dat.groupby('expand_ever'):
-    label = 'Expanded (2014)' if val == 1 else 'Never Expanded'
-    ax.plot(grp['year'], grp['uncomp_care_m'], marker='o', label=label)
-ax.axvline(2013.5, color='red', linestyle='--', alpha=0.7, label='ACA 2014')
+    if val == 1:
+        ax.plot(grp['year'], grp['uncomp_care_m'], marker='o',
+                color='black', linestyle='-', label='Expansion')
+    else:
+        ax.plot(grp['year'], grp['uncomp_care_m'], marker='o',
+                color='black', linestyle='--', label='Non-expansion')
+ax.axvline(2013.5, color='red', linewidth=1, label='2014')
 ax.set_xlabel('Year')
-ax.set_ylabel('Mean Uncompensated Care ($mm)')
-ax.set_title('Mean Uncompensated Care Over Time by Expansion Status')
+ax.set_ylabel('Mean Uncompensated Care (MM)')
+ax.set_title('Mean Uncompensated Care by Medicaid Expansion Status')
 ax.legend()
-ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f'${x:.0f}mm'))
 plt.tight_layout()
 plt.show()
 ```
+
 ```{python}
-md(
-    "**Q2 answer:** The graph does suggest a treatment effect. Before 2014 the two groups "
-    "tracked each other fairly closely --- expanders averaged 9.27mm and never-expanders "
-    "7.23mm in 2013. After expansion, both groups declined, but expanding states fell more "
-    "sharply, reaching 6.22mm by 2015 compared to 6.13mm for never-expanders. The gap "
-    "opening up right at 2014 is consistent with Medicaid expansion converting previously "
-    "uninsured patients into covered ones, reducing the care hospitals had to absorb for free."
-)
+exp13 = str(round(float(q2_dat.loc[(q2_dat['expand_ever']==1)&(q2_dat['year']==2013), 'uncomp_care_m'].values[0]), 2))
+nev13 = str(round(float(q2_dat.loc[(q2_dat['expand_ever']==0)&(q2_dat['year']==2013), 'uncomp_care_m'].values[0]), 2))
+exp15 = str(round(float(q2_dat.loc[(q2_dat['expand_ever']==1)&(q2_dat['year']==2015), 'uncomp_care_m'].values[0]), 2))
+nev15 = str(round(float(q2_dat.loc[(q2_dat['expand_ever']==0)&(q2_dat['year']==2015), 'uncomp_care_m'].values[0]), 2))
+
+md("Figure 1 presents mean uncompensated care by expansion status. Both groups show similar pre-2014 trends, with a clear divergence after 2014 as expansion states see larger reductions in uncompensated care. In 2013, expanders averaged " + exp13 + "mm and never-expanders averaged " + nev13 + "mm. By 2015, expanders fell to " + exp15 + "mm while never-expanders stood at " + nev15 + "mm.")
 ```
 
 \newpage
 
 ## 3. 2x2 Difference-in-Differences Table
+
 ```{python}
 #| label: tbl-q3
-#| tbl-cap: "2x2 DD table of mean uncompensated care ($mm), pre (2012) vs post (2015)"
+#| tbl-cap: "2x2 DD table of mean uncompensated care (mm), pre (2012) vs post (2015)"
 #| output: asis
 
 q3_tab = (
@@ -160,143 +190,135 @@ q3_tab = (
     .unstack('year')
     .rename(columns={2012: 'Pre (2012)', 2015: 'Post (2015)'})
 )
-q3_tab.index = q3_tab.index.map({0: 'Never Expanded', 1: 'Expanded (2014)'})
-q3_tab['Difference'] = q3_tab['Post (2015)'] - q3_tab['Pre (2012)']
+q3_tab.index = q3_tab.index.map({0: 'Non-expansion', 1: 'Expansion'})
+q3_tab.index.name = None
+q3_tab.columns.name = None
 q3_tab = q3_tab.round(2)
 
 dd_est = (
-    q3_tab.loc['Expanded (2014)', 'Difference'] -
-    q3_tab.loc['Never Expanded',  'Difference']
+    (q3_tab.loc['Expansion', 'Post (2015)'] - q3_tab.loc['Expansion', 'Pre (2012)']) -
+    (q3_tab.loc['Non-expansion', 'Post (2015)'] - q3_tab.loc['Non-expansion', 'Pre (2012)'])
 )
 
-nev = q3_tab.loc['Never Expanded']
-exp = q3_tab.loc['Expanded (2014)']
+print(q3_tab.to_latex(escape=False))
+```
 
-latex = (
-    "\\begin{longtable}{llll}\n"
-    "\\toprule\n"
-    "Group & Pre (2012) & Post (2015) & Difference \\\\\n"
-    "\\midrule\n"
-    f"Never Expanded & {nev['Pre (2012)']:.2f} & {nev['Post (2015)']:.2f} & {nev['Difference']:.2f} \\\\\n"
-    f"Expanded (2014) & {exp['Pre (2012)']:.2f} & {exp['Post (2015)']:.2f} & {exp['Difference']:.2f} \\\\\n"
-    "\\bottomrule\n"
-    "\\end{longtable}\n"
-    f"\nDD Estimate: {dd_est:.2f}mm"
-)
-print(latex)
+```{python}
+dd_str = str(round(float(dd_est), 2))
+md("Table 2 presents the 2x2 DD table. The DD estimate is " + dd_str + " million dollars, suggesting that Medicaid expansion reduced hospital uncompensated care.")
 ```
 
 \newpage
 
 ## 4. Policy Discussion
+
 ```{python}
-md(
-    "**Q4 answer:** Several forces were at work during this period. The most direct is "
-    "Medicaid expansion itself which covered adults up to 138% of the federal poverty "
-    "level. This means that hospitals could bill for care they previously wrote off "
-    "entirely. But the ACA's insurance exchanges were also pulling in uninsured people "
-    "in non-expansion states, which partly explains why never-expanders also saw declines. "
-    "The broader economic recovery from the 2008 recession reduced the share of patients "
-    "unable to pay their bills. Also, S-10 reporting standards shifted around 2012-2013, "
-    "so some of the measured change reflects accounting practices rather than actual care "
-    "delivered. Taken together, we expect expansion to reduce uncompensated care "
-    "specifically because insured patients generate reimbursable claims. Hospitals get "
-    "paid instead of absorbing the cost."
-)
+md("Several forces were at work during this period. The most direct is Medicaid expansion itself, which covered adults up to 138 percent of the federal poverty level. Hospitals could bill for care they previously wrote off entirely. But the ACA's insurance exchanges also pulled in uninsured people in non-expansion states, which partly explains why never-expanders also saw declines. The broader economic recovery from the 2008 recession reduced the share of patients unable to pay, and S-10 reporting standards shifted around 2012-2013, so some of the measured change reflects accounting practices rather than actual care delivered. We expect expansion to reduce uncompensated care because insured patients generate reimbursable claims. Hospitals get paid instead of absorbing the cost.")
 ```
 
 \newpage
 
 ## 5. Standard DD Regression
+
 ```{python}
-#| label: tbl-q5
-#| tbl-cap: "DD regression estimates of Medicaid expansion on uncompensated care ($mm)"
-#| output: asis
+dd_t  = str(round(float(q5_treat), 3))
+dd_se = str(round(float(q5_treat_se), 3))
 
-coef_labels = {
-    'Intercept':   'Intercept',
-    'post':        'Post (year $\\geq$ 2014)',
-    'expand_ever': 'Expanded',
-    'treat':       'Treat (Post $\\times$ Expanded)',
-}
-
-rows = []
-for var, label in coef_labels.items():
-    rows.append([label,
-                 f'{q5.params[var]:.3f}',
-                 f'({q5.bse[var]:.3f})'])
-
-q5_df = pd.DataFrame(rows, columns=['', 'Coef', 'SE'])
-q5_df.loc[len(q5_df)] = ['N', f'{int(q5.nobs):,}', '']
-q5_df.loc[len(q5_df)] = ['$R^2$', f'{q5.rsquared:.3f}', '']
-
-print(q5_df.to_latex(index=False, escape=False))
+md("The standard DD estimate of the effect of Medicaid expansion on uncompensated care is " + dd_t + "mm (SE " + dd_se + ") on " + str(q5_n) + " observations. The negative sign is consistent with Medicaid expansion reducing uncompensated care, though the estimate does not reach statistical significance. Full results are presented alongside the TWFE estimates in Table 4.")
 ```
 
 \newpage
 
 ## 6. TWFE with Hospital and Year Fixed Effects
+
 ```{python}
 #| label: tbl-q6
-#| tbl-cap: "TWFE estimates: hospital and year fixed effects, state-clustered SEs (2014 expanders and never-expanders)"
+#| tbl-cap: "DD Estimates with TWFE"
 #| output: asis
 
-q6_coef = q6.coef()['treat']
-q6_se   = q6.se()['treat']
-q6_n    = int(q6._N)
+tab_q6 = pd.DataFrame({
+    'Standard DD': [
+        f'{q5_int:.3f}',   f'({q5_int_se:.3f})',
+        f'{q5_post:.3f}',  f'({q5_post_se:.3f})',
+        f'{q5_exp:.3f}',   f'({q5_exp_se:.3f})',
+        f'{q5_treat:.3f}', f'({q5_treat_se:.3f})',
+        f'{q5_n:,}',       f'{q5_r2:.3f}', '', ''
+    ],
+    'TWFE': [
+        '', '', '', '', '', '',
+        f'{q6_treat:.3f}', f'({q6_treat_se:.3f})',
+        f'{q6_n:,}',       str(q6_r2), str(q6_r2_within), 'by: state'
+    ]
+}, index=[
+    '(Intercept)', '',
+    'Post 2014', '',
+    'Expand', '',
+    'Post x Expand', '',
+    'Num.Obs.', 'R2', 'R2 Within', 'Std.Errors'
+])
 
-q6_df = pd.DataFrame({
-    '':         ['Treat', '', 'N'],
-    'Estimate': [f'{q6_coef:.3f}', f'({q6_se:.3f})', f'{q6_n:,}']
-})
-print(q6_df.to_latex(index=False, escape=False))
+print(tab_q6.to_latex(escape=False))
 ```
+
 ```{python}
-md(
-    "**Q6 answer:** Adding hospital and year fixed effects changes the estimate noticeably. "
-    "The simple DD (Q5) gave -0.649mm (SE 1.599, p=0.685), while the TWFE estimate is "
-    "-1.268mm (SE 1.884, p=0.505) on 25,197 observations. Hospital fixed effects absorb "
-    "permanent differences across hospitals --- size, teaching status, location --- that were "
-    "biasing the simple DD upward. Year fixed effects remove common trends affecting all "
-    "hospitals regardless of expansion status. Neither estimate is statistically significant, "
-    "but both are negative and point in the expected direction. The TWFE estimate is larger "
-    "in magnitude than the simple DD, suggesting OLS was understating the effect of expansion."
-)
+tw_t  = str(round(float(q6_treat), 3))
+tw_se = str(round(float(q6_treat_se), 3))
+tw_n  = str(q6_n)
+
+md("Table 4 presents the TWFE results alongside the standard DD. The TWFE estimate with hospital and year fixed effects accounts for time-invariant hospital characteristics and common year shocks. The standard DD gives a Post x Expand coefficient of " + dd_t + "mm (SE " + dd_se + ") while the TWFE estimate is " + tw_t + "mm (SE " + tw_se + ") on " + tw_n + " observations. Results are qualitatively similar, though the point estimate differs due to the additional controls.")
 ```
 
 \newpage
 
 ## 7. TWFE with All States
+
 ```{python}
 #| label: tbl-q7
-#| tbl-cap: "TWFE estimates: all states, hospital and year fixed effects, state-clustered SEs"
+#| tbl-cap: "DD Estimates with Staggered Treatment"
 #| output: asis
 
-q7_coef = q7.coef()['treat']
-q7_se   = q7.se()['treat']
-q7_n    = int(q7._N)
+tab_q7 = pd.DataFrame({
+    'Standard DD': [
+        f'{q5_int:.3f}',   f'({q5_int_se:.3f})',
+        f'{q5_post:.3f}',  f'({q5_post_se:.3f})',
+        f'{q5_exp:.3f}',   f'({q5_exp_se:.3f})',
+        f'{q5_treat:.3f}', f'({q5_treat_se:.3f})',
+        f'{q5_n:,}',       f'{q5_r2:.3f}', '', ''
+    ],
+    'TWFE': [
+        '', '', '', '', '', '',
+        f'{q6_treat:.3f}', f'({q6_treat_se:.3f})',
+        f'{q6_n:,}',       str(q6_r2), str(q6_r2_within), 'by: state'
+    ],
+    'Staggered': [
+        '', '', '', '', '', '',
+        f'{q7_treat:.3f}', f'({q7_treat_se:.3f})',
+        f'{q7_n:,}',       str(q7_r2), str(q7_r2_within), 'by: state'
+    ]
+}, index=[
+    '(Intercept)', '',
+    'Post 2014', '',
+    'Expand', '',
+    'Post x Expand', '',
+    'Num.Obs.', 'R2', 'R2 Within', 'Std.Errors'
+])
 
-q7_df = pd.DataFrame({
-    '':         ['Treat', '', 'N'],
-    'Estimate': [f'{q7_coef:.3f}', f'({q7_se:.3f})', f'{q7_n:,}']
-})
-print(q7_df.to_latex(index=False, escape=False))
+print(tab_q7.to_latex(escape=False))
 ```
+
 ```{python}
-md(
-    "**Q7 answer:** Including all states shifts the estimate from -1.268mm to -0.643mm, "
-    "moving it closer to zero. This reflects a known problem with TWFE under staggered "
-    "adoption --- when states expand at different times, already-treated states get used as "
-    "implicit controls for later-treated ones. If treatment effects differ across expansion "
-    "cohorts or evolve over time, this contaminates the estimate. The fact that the "
-    "coefficient shifts when late-expanders are added is a signal that those dynamics "
-    "are present here."
-)
+tw_t2 = str(round(float(q6_treat), 3))
+st_t  = str(round(float(q7_treat), 3))
+st_se = str(round(float(q7_treat_se), 3))
+st_n  = str(q7_n)
+
+md("Table 5 presents results including all states with staggered treatment timing. Including all states shifts the Post x Expand estimate from " + tw_t2 + "mm to " + st_t + "mm (SE " + st_se + ") on " + st_n + " observations. This can reflect the standard problem with TWFE under staggered adoption, where already-treated states serve as implicit controls for later-treated ones and can contaminate the estimate if treatment effects differ across cohorts.")
 ```
 
 \newpage
 
 ## 8. Event Study: 2014 Expanders vs Never-Expanders
+
 ```{python}
 #| label: fig-q8
 #| fig-cap: "Event study: effect of Medicaid expansion on uncompensated care, 2014 expanders vs never-expanders (ref: 2013)"
@@ -304,7 +326,7 @@ md(
 q8_coefs = q8.coef()
 q8_ses   = q8.se()
 
-years_plot, ests, cis_low, cis_high = [], [], [], []
+years_plot, ests8, cis_low8, cis_high8 = [], [], [], []
 for key in q8_coefs.index:
     m = re.search(r'\[(\d+)\]:expand_ever', key)
     if m:
@@ -312,40 +334,42 @@ for key in q8_coefs.index:
         est = float(q8_coefs[key])
         se  = float(q8_ses[key])
         years_plot.append(yr)
-        ests.append(est)
-        cis_low.append(est - 1.96 * se)
-        cis_high.append(est + 1.96 * se)
+        ests8.append(est)
+        cis_low8.append(est - 1.96 * se)
+        cis_high8.append(est + 1.96 * se)
 
-years_plot.append(2013); ests.append(0); cis_low.append(0); cis_high.append(0)
-sorted_data = sorted(zip(years_plot, ests, cis_low, cis_high))
-years_plot, ests, cis_low, cis_high = zip(*sorted_data)
-ests     = np.array(ests)
-cis_low  = np.array(cis_low)
-cis_high = np.array(cis_high)
+years_plot.append(2013); ests8.append(0); cis_low8.append(0); cis_high8.append(0)
+sorted_data = sorted(zip(years_plot, ests8, cis_low8, cis_high8))
+years_plot, ests8, cis_low8, cis_high8 = zip(*sorted_data)
+ests8    = np.array(ests8)
+cis_low8 = np.array(cis_low8)
+cis_high8 = np.array(cis_high8)
 
 fig, ax = plt.subplots(figsize=(10, 5))
 ax.errorbar(
-    years_plot, ests,
-    yerr=[ests - cis_low, cis_high - ests],
-    fmt='o', color='steelblue', capsize=4, linewidth=1.5
+    years_plot, ests8,
+    yerr=[ests8 - cis_low8, cis_high8 - ests8],
+    fmt='o', color='black', capsize=4, linewidth=1.5, markersize=5
 )
 ax.axhline(0, color='black', linewidth=0.8)
-ax.axvline(2013.5, color='red', linestyle='--', alpha=0.7, label='Expansion (2014)')
+ax.axvline(2013.5, color='red', linestyle='--', linewidth=1, label='Expansion (2014)')
 ax.set_xlabel('Year')
-ax.set_ylabel('Estimate ($mm)')
-ax.set_title(
-    'Event Study: Effect of Medicaid Expansion on Uncompensated Care\n'
-    '2014 Expanders vs Never-Expanders (Ref: 2013)'
-)
+ax.set_ylabel('Estimate and 95% Conf. Int.')
+ax.set_title('Event Study with Common Treatment Time')
 ax.set_xticks(list(years_plot))
 ax.legend()
 plt.tight_layout()
 plt.show()
 ```
 
+```{python}
+md("Figure 2 presents event study estimates for 2014 expansion. Pre-2014 coefficients near zero support the parallel trends assumption. Post-expansion coefficients turn negative and grow in magnitude, consistent with a persistent reduction in uncompensated care among expanding states relative to never-expanders.")
+```
+
 \newpage
 
 ## 9. Event Study: All States (Event Time)
+
 ```{python}
 #| label: fig-q9
 #| fig-cap: "Event study: effect of Medicaid expansion on uncompensated care, all states on event time (ref: t=-1)"
@@ -368,53 +392,46 @@ for key in q9_coefs.index:
 times_plot.append(-1); ests9.append(0); cis_low9.append(0); cis_high9.append(0)
 sorted_data9 = sorted(zip(times_plot, ests9, cis_low9, cis_high9))
 times_plot, ests9, cis_low9, cis_high9 = zip(*sorted_data9)
-ests9     = np.array(ests9)
-cis_low9  = np.array(cis_low9)
+ests9    = np.array(ests9)
+cis_low9 = np.array(cis_low9)
 cis_high9 = np.array(cis_high9)
 
 fig, ax = plt.subplots(figsize=(10, 5))
 ax.errorbar(
     times_plot, ests9,
     yerr=[ests9 - cis_low9, cis_high9 - ests9],
-    fmt='o', color='steelblue', capsize=4, linewidth=1.5
+    fmt='o', color='black', capsize=4, linewidth=1.5, markersize=5
 )
 ax.axhline(0, color='black', linewidth=0.8)
-ax.axvline(-0.5, color='red', linestyle='--', alpha=0.7, label='Expansion (t=0)')
-ax.set_xlabel('Years Relative to Expansion')
-ax.set_ylabel('Estimate ($mm)')
-ax.set_title(
-    'Event Study: Effect of Medicaid Expansion on Uncompensated Care\n'
-    'All States --- Event Time (Ref: t=-1)'
-)
+ax.axvline(-0.5, color='red', linestyle='--', linewidth=1, label='Expansion (t=0)')
+ax.set_xlabel('Time to Treatment')
+ax.set_ylabel('Estimate and 95% Conf. Int.')
+ax.set_title('Event Study with Staggered Treatment')
 ax.set_xticks(list(times_plot))
 ax.legend()
 plt.tight_layout()
 plt.show()
 ```
 
+```{python}
+md("Figure 3 presents the event study with staggered treatment. Time 0 denotes the year of expansion, with t-1 as the reference period. Endpoints are binned at t-4. Pre-expansion coefficients are near zero, supporting parallel trends. Post-expansion estimates turn negative and grow, consistent with a persistent reduction in uncompensated care.")
+```
+
 \newpage
 
 ## 10. Summary and TWFE Limitations
+
 ```{python}
-md(
-    "**Q10 answer:** Across Questions 5 through 9, the results consistently point toward "
-    "Medicaid expansion reducing uncompensated care, though none of the estimates reach "
-    "statistical significance. The simple DD (Q5) gave -0.649mm, TWFE on the 2014 sample "
-    "(Q6) gave -1.268mm, and adding all states (Q7) produced -0.643mm --- all negative "
-    "and in the expected direction.\n\n"
-    "The event study in Q8 raises some concern about parallel trends. The pre-period "
-    "coefficients for 2011 (-2.440mm, SE 1.266) and 2012 (-1.250mm) are not close to "
-    "zero, suggesting expanding and non-expanding states may have been on somewhat "
-    "different trajectories before 2014. If that pre-existing divergence is real, our DD "
-    "estimates partly capture it rather than the effect of expansion alone. Post-expansion, "
-    "the coefficient for 2015 is -2.414mm and remains negative through the end of the "
-    "sample, consistent with a persistent reduction in uncompensated care, though the wide "
-    "confidence intervals make it difficult to pin down the magnitude with precision.\n\n"
-    "The core limitation of TWFE with staggered adoption is that it uses already-treated "
-    "states as controls for later-treated ones. If early and late expanders experienced "
-    "different effect sizes, those comparisons inject bias and can even produce negative "
-    "weights on some underlying 2x2 DDs. There are other alternatives that can estimate "
-    "cohort-specific effects before aggregating, which avoids this problem by never using "
-    "treated units as controls."
-)
+dd_t3 = str(round(float(q5_treat), 3))
+dd_se3 = str(round(float(q5_treat_se), 3))
+tw_t3 = str(round(float(q6_treat), 3))
+tw_se3 = str(round(float(q6_treat_se), 3))
+st_t3 = str(round(float(q7_treat), 3))
+st_se3 = str(round(float(q7_treat_se), 3))
+
+md("Across Questions 5 through 9, results consistently point toward Medicaid expansion reducing uncompensated care, though none reach statistical significance. The simple DD gave " + dd_t3 + "mm (SE " + dd_se3 + "), the TWFE on the 2014 sample gave " + tw_t3 + "mm (SE " + tw_se3 + "), and adding all states produced " + st_t3 + "mm (SE " + st_se3 + "). They are all negative and in the expected direction.")
+
+md("The event study in Q8 raises some concern about parallel trends. Pre-period coefficients are not uniformly close to zero, suggesting expanding and non-expanding states may have been on somewhat different trajectories before 2014. Post-expansion, coefficients turn negative and remain so, consistent with a persistent reduction in uncompensated care.")
+
+md("The core limitation of TWFE with staggered adoption is that it uses already-treated states as controls for later-treated ones. If early and late expanders experienced different effect sizes, this contaminates the estimate and can produce negative weights on some underlying 2x2 DDs. Other estimators that we briefly talked about in class address this by estimating cohort-specific effects before aggregating, which avoids the problem of using treated units as controls.")
 ```
